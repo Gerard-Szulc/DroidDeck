@@ -19,10 +19,12 @@ object DeviceSupport {
         File("/sys/class/kgsl/kgsl-3d0").exists() || File("/vendor/lib64/hw/vulkan.adreno.so").exists()
 
     /** Samsung Exynos GPUs (Xclipse): an amdgpu render node instead of the Qualcomm KGSL node. */
+    @JvmStatic
     fun xclipse(): Boolean =
         File("/dev/dri/renderD128").exists() && !adreno()
 
     /** Either a supported Adreno or a supported Xclipse: both can draw a Linux session. */
+    @JvmStatic
     fun usableGpu(): Boolean = adreno() || xclipse()
 
     /** The chip as the device names it, for the card that explains the refusal. */

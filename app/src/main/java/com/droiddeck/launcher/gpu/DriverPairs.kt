@@ -94,6 +94,8 @@ object DriverPairs {
      */
     fun recommendedKey(gpu: GpuInfo, pairs: List<DriverPair>): String? = when (gpu.family) {
         Family.NOT_ADRENO -> null
+        // Xclipse has no Turnip pair: the RADV driver is imported as a Linux driver, not Auto-picked.
+        Family.XCLIPSE -> null
         Family.A8XX -> if (gpu.model == 840) newestDdTurnip(pairs) ?: WN_BALANCED else WN_BALANCED
         Family.A7XX_LOW -> BANNER_710
         Family.A7XX -> if (gpu.oneUi8Gen2) BANNER_ONEUI else BANNER
