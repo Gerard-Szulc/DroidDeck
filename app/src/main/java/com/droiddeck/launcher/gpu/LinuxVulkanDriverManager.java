@@ -50,6 +50,9 @@ public class LinuxVulkanDriverManager {
     private static final String TAG = "LinuxVulkanDriver";
     public static final String DIR_NAME = "linux_vulkan_drivers";
     public static final String LIB_NAME = "libvulkan_freedreno.so";
+    /** The alternative driver name the Xclipse RADV builds use; the installer keeps whichever the
+     *  zip carries, so both the Turnip and the RADV zips import through the same path. */
+    public static final String LIB_NAME_RADEON = "libvulkan_radeon.so";
     public static final String ICD_NAME = "icd.json";
     public static final String META_NAME = "meta.json";
 
@@ -141,7 +144,7 @@ public class LinuxVulkanDriverManager {
                     // Flatten: only the base name matters, and it also defeats zip-slip paths.
                     String base = new File(entry.getName()).getName();
                     if (base.isEmpty()) continue;
-                    if (base.startsWith("libvulkan_freedreno") && base.endsWith(".so")) {
+                    if ((base.startsWith("libvulkan_freedreno") || base.startsWith("libvulkan_radeon")) && base.endsWith(".so")) {
                         if (soName != null) Log.w(TAG, "zip has several libvulkan_freedreno*.so; using the first (" + soName + ")");
                         else {
                             Files.copy(zis, new File(tmpDir, LIB_NAME).toPath(), StandardCopyOption.REPLACE_EXISTING);

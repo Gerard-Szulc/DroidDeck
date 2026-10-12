@@ -35,6 +35,8 @@ data class GpuInfo(
         A6XX("Adreno 6xx"),
         /** An Adreno whose model KGSL does not give: treated as the newest family it could be. */
         ADRENO_UNKNOWN("Adreno"),
+        /** Samsung Exynos GPUs (Xclipse 920/940 etc.) driven by the community RADV driver. */
+        XCLIPSE("Samsung Xclipse"),
         NOT_ADRENO("Not an Adreno GPU");
 
         /** [label] in the app's language: the Adreno families are names, the rest is words. */
@@ -46,6 +48,7 @@ data class GpuInfo(
     val support: Support
         get() = when {
             family == Family.NOT_ADRENO -> Support.UNSUPPORTED
+            family == Family.XCLIPSE -> Support.UNTESTED
             family == Family.A6XX && model == 650 -> Support.TESTED
             family == Family.A8XX -> Support.TESTED
             family == Family.A7XX && model >= 725 -> Support.TESTED
@@ -56,8 +59,11 @@ data class GpuInfo(
     val supportText: String
         get() = when (support) {
             Support.TESTED -> "Supported"
-            Support.UNTESTED -> if (family == Family.A7XX_LOW) "Experimental: its drivers are test builds"
-                else "Outside tested hardware (Adreno 650, 725 and newer): it may not run"
+            Support.UNTESTED -> when (family) {
+                Family.A7XX_LOW -> "Experimental: its drivers are test builds"
+                Family.XCLIPSE -> "Experimental: needs the community RADV driver for the Xclipse"
+                else -> "Outside tested hardware (Adreno 650, 725 and newer): it may not run"
+            }
             Support.UNSUPPORTED -> "Not supported: DroidDeck needs an Adreno (Snapdragon) GPU"
         }
 
@@ -77,6 +83,9 @@ data class GpuInfo(
 
         fun detect(): GpuInfo {
             val adreno = File("/sys/class/kgsl/kgsl-3d0").exists() || File("/vendor/lib64/hw/vulkan.adreno.so").exists()
+            // Samsung Exynos GPUs: the SGPU is an amdgpu render node (Xclipse 920/940 etc.), not KGSL.
+            val xclipse = !adreno && File("/dev/dri/renderD128").exists() &&
+                systemProperty("ro.soc.model").lowercase().startsWith("s5e")
             val raw = listOf("/sys/class/kgsl/kgsl-3d0/gpu_model", "/sys/class/kgsl/kgsl-3d0/gpu_chipid")
                 .firstNotNullOfOrNull { FileUtils.readString(File(it))?.trim()?.takeIf(String::isNotEmpty) }
             // Where vendors put the chip's model, named when it is known: "Snapdragon 8 Gen 2 (QCS8550)".
@@ -94,10 +103,10 @@ data class GpuInfo(
                 fromPlatform > 0 -> "platform"
                 else -> ""
             }
-            val family = familyOf(adreno, model)
+            val family = if (xclipse) Family.XCLIPSE else familyOf(adreno, model)
             val samsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
             return GpuInfo(
-                name = if (!adreno) Build.HARDWARE.ifBlank { UNNAMED } else if (model > 0) "Adreno $model" else "Adreno",
+                name = if (xclipse) SocNames.model().ifBlank { "Xclipse" } else if (!adreno) Build.HARDWARE.ifBlank { UNNAMED } else if (model > 0) "Adreno $model" else "Adreno",
                 model = model, family = family, soc = soc,
                 oneUi8Gen2 = samsung && model == 740,
                 kgslName = raw.orEmpty(), modelSource = source,

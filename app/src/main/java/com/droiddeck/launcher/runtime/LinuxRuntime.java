@@ -114,6 +114,12 @@ public final class LinuxRuntime {
         File icdDir = new File(rootDir(context), "usr/share/vulkan/icd.d");
         File[] manifests = icdDir.listFiles((dir, name) -> name.endsWith(".json"));
         if (manifests == null) return null;
+        /* Xclipse (Samsung Exynos) devices run the community RADV driver; prefer its manifest. */
+        if (com.droiddeck.launcher.core.DeviceSupport.xclipse()) {
+            for (File manifest : manifests) {
+                if (manifest.getName().contains("radeon")) return manifest;
+            }
+        }
         for (File manifest : manifests) {
             if (manifest.getName().contains("freedreno")) return manifest;
         }
@@ -277,8 +283,12 @@ public final class LinuxRuntime {
                 bind(cmd, fake.getPath() + ":" + entry[1]);
             }
         }
-        bindGpuNode(context, cmd);
-        bindAdrenoStats(cmd, extraBinds);
+        if (com.droiddeck.launcher.core.DeviceSupport.xclipse()) {
+            bindXclipseGpuNode(cmd);
+        } else {
+            bindGpuNode(context, cmd);
+            bindAdrenoStats(cmd, extraBinds);
+        }
         bindCpuTemps(cmd, root);
         if (extraBinds != null) {
             for (String spec : extraBinds) bind(cmd, spec);
@@ -296,6 +306,17 @@ public final class LinuxRuntime {
      * may open) stands in: it appears as a render node with the sysfs entries libdrm reads, and our
      * Turnip build reports the same device numbers for it.
      */
+    /**
+     * Xclipse (Samsung Exynos): the SGPU is a real amdgpu render node, world-accessible and already
+     * named /dev/dri/renderD128 - just bind it into the guest. The KGSL stand-in below cannot
+     * apply, and the Adreno sysfs (MangoHud stats) has no Xclipse equivalent yet.
+     */
+    private static void bindXclipseGpuNode(List<String> cmd) {
+        File node = new File("/dev/dri/renderD128");
+        if (!node.canRead()) return;
+        bind(cmd, node.getPath() + ":/dev/dri/renderD128");
+    }
+
     private static void bindGpuNode(Context context, List<String> cmd) {
         StructStat st;
         try {
